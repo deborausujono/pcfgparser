@@ -1,0 +1,2 @@
+fout = open('tst.parse.gold', 'w')
+fout.write('aaaaa')
