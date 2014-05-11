@@ -35,6 +35,8 @@ The parser also deletes non-terminal rules that only occur once in the training 
 
 None will be returned if the parser fails to parse a sentence.
 
+The parser was written in Python 2.7.3.
+
 Evaluation
 ----------
 Recall: 70.88  
