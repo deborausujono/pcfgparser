@@ -1,3 +1,5 @@
+Usage
+-----
 To run the test using the default setup:
 ```
 python test_cfg.py
