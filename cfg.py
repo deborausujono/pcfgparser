@@ -1,219 +1,166 @@
-import sys
 from random import choice
 
-def getgrammar(file):
-    """Given a file containing weighted rules, return a dictionary of
-    weighted rules"""
-    grammar = {}
-    rules = open(file, 'r').readlines()
+class PCFGParser:
+    RULES = 'data/weighted.rule'
+
+    def __init__(self):
+        self.grammar = self.__read_grammar(self.RULES)
+
+    def __read_grammar(self, f):
+        """Given a file containing weighted rules, f, return a dictionary of
+        those rules."""
+
+        grammar = {}
+        rules = open(f, 'r')
     
-    for rule in rules:
-        tmp = rule.split()
-        lhs = tmp[0]
-        rhs = ' '.join(tmp[1:-1])
-        weight = float(tmp[-1])
+        for rule in rules:
+            tmp = rule.split()
+            lhs = tmp[0]
+            rhs = ' '.join(tmp[1:-1])
+            weight = float(tmp[-1])
 
-        if lhs in grammar:
-            if rhs in grammar[lhs]: print 'Weird!'
-            else: grammar[lhs][rhs] = weight
-        else:
-            grammar[lhs] = {rhs: weight}
+            if lhs in grammar:
+                grammar[lhs][rhs] = weight
+            else:
+                grammar[lhs] = {rhs: weight}
 
-    return grammar
+        rules.close()
 
-def generate(phrase):
-    "Generate a random sentence or phrase"
-    if isinstance(phrase, list): 
-        return mappend(generate, phrase)
-    elif phrase in grammar:
-        return generate(choice(grammar[phrase]))
-    else: return [phrase]
-    
-def generate_tree(phrase):
-    """Generate a random sentence or phrase,
-     with a complete parse tree."""
-    if isinstance(phrase, list): 
-        return map(generate_tree, phrase)
-    elif phrase in grammar:
-        return [phrase] + generate_tree(choice(grammar[phrase]))
-    else: return [phrase]
+        return grammar
 
-def mappend(fn, list):
-    "Append the results of calling fn on each element of list."
-    return reduce(lambda x,y: x+y, map(fn, list))
+    def __mappend(self, fn, list):
+        """Append the results of calling fn on each element of list."""
+        return reduce(lambda x,y: x+y, map(fn, list))
 
-def producers(constprob):
-    """Argument is a list containing the rhs of some rule; return all possible
-    lhs's"""
-    constituent = constprob[0]
-    prob1 = constprob[1]
+    def __producers(self, rhs, prob):
+        """Given the rhs of a rule (e.g. "NP VP", "president"), rhs, and
+        their joint probability (or 0 in the case of a terminal), prob,
+        return all possible lhs's."""
 
-    results = []
-    for (lhs, rhsdict) in grammar.items():
-	for rhs in rhsdict:
-            prob2 = rhsdict[rhs]
-	    if rhs == constituent:
-                #print lhs, prob1+prob2
-                lhsprob = (lhs, prob1+prob2)
-		results.append(lhsprob)
+        results = []
+        for (lhs, d) in self.grammar.iteritems():
+            for current_rhs in d:
+                if current_rhs == rhs:
+                    r = (lhs, prob + d[current_rhs])
+                    results.append(r)
 
-    #Handle unseen words and unknown non-terminal rules
-    if len(constituent.split()) == 1 and not results:
-        for (lhs, rhsdict) in grammar.items():
-            if '<UNK>' in rhsdict:
-                prob2 = rhsdict['<UNK>']
-                lhsprob = (lhs, prob1+prob2)
-                results.append(lhsprob)
+        # Handle unseen words
+        if len(rhs.split()) == 1 and not results:
+            for (lhs, d) in self.grammar.iteritems():
+                if '<UNK>' in d:
+                    r = (lhs, d['<UNK>'])
+                    results.append(r)
             
-    return results
+        return results
 
-def printtable(table, wordlist):
-    "Print the dynamic programming table.  The leftmost column is always empty."
-    print "    ", wordlist
-    for row in table:
-	print row
+    def __to_tree(self, table, pointer, sentence, j, i, k):
+        """Trace back the pointer table recursively and return the parse tree."""
 
-def parsetree(table, pointer, wordlist, j, i, k):
-    if pointer[j][i]: #not empty
-        rhs = []
+        if pointer[j][i]: #not empty
+            rhs = []
 
-        #rhs1
-        nj1 = pointer[j][i][k][0][0]
-        ni1 = pointer[j][i][k][0][1]
-        nk1 = pointer[j][i][k][0][2]
-        rhs.append(parsetree(table, pointer, wordlist, nj1, ni1, nk1))
+            #rhs1
+            nj1 = pointer[j][i][k][0][0]
+            ni1 = pointer[j][i][k][0][1]
+            nk1 = pointer[j][i][k][0][2]
+            rhs.append(self.__to_tree(table, pointer, sentence, nj1, ni1, nk1))
 
-        #rhs2
-        nj2 = pointer[j][i][k][1][0]
-        ni2 = pointer[j][i][k][1][1]
-        nk2 = pointer[j][i][k][1][2]
-        rhs.append(parsetree(table, pointer, wordlist, nj2, ni2, nk2))
+            #rhs2
+            nj2 = pointer[j][i][k][1][0]
+            ni2 = pointer[j][i][k][1][1]
+            nk2 = pointer[j][i][k][1][2]
+            rhs.append(self.__to_tree(table, pointer, sentence, nj2, ni2, nk2))
 
-    else: #empty
-        rhs = [wordlist[i-1]]
+        else: #empty
+            rhs = [sentence[i-1]]
 
-    tree = [table[j][i][k][0]]
-    tree.extend(rhs)
-    return tree
+        tree = [table[j][i][k][0]]
+        tree.extend(rhs)
 
-def parse(sentence):
-    """The CYK parser.  Return True if sentence is in the grammar;
-    False otherwise"""
+        return tree
+
+    def __print_table(self, table, sentence):
+        """Print the dynamic programming table. Useful for debugging.
+        The leftmost column is always empty."""
+
+        print sentence
+        for row in table:
+            print row[1:]
+
+    def generate(self, cat):
+        """Given a syntactic category (e.g. S, VP, NN), cat, return a
+        randomly generated sentence, phrase or word of that category."""
+
+        if isinstance(cat, list): 
+            return self.__mappend(self.generate, cat)
+        elif cat in self.grammar:
+            return self.generate(choice(self.grammar[cat].keys()).split())
+        else:
+            return [cat]
+
+    def parse(self, sentence):
+        """The CYK parser. Given a list of words, sentence, return its parse
+        tree if the sentence is in the grammar or None otherwise."""
+
+        # Create the CYK table
+        length = len(sentence)
+        table = [None] * (length)
+        for j in range(length):
+            table[j] = [None] * (length+1)
+            for i in range(length+1):
+                table[j][i] = []
+
+        # Create a pointer table
+        pointer = [None] * (length)
+        for j in range(length):
+            pointer[j] = [None] * (length+1)
+            for i in range(length+1):
+                pointer[j][i] = []
+
+        # Fill the diagonal of the CYK table with parts-of-speech of the words
+        for k in range(1, length+1):
+            table[k-1][k].extend(self.__producers(sentence[k-1], 0))
+
+        # Fill the CYK table
+        for i in range (1, length+1):
+            for j in range(i-2, -1, -1):
+                for k in range(j+1, i):
+                    # Test all combinations of rhslist
+                    for l in range(len(table[j][k])):
+                        for m in range(len(table[k][i])):
+                            prob = table[j][k][l][1] + table[k][i][m][1]
+                            rhs = table[j][k][l][0]+' '+table[k][i][m][0]
+                            lhs = self.__producers(rhs, prob)
+                            if lhs:
+                                table[j][i].extend(lhs)
+                                pointer[j][i].extend([[[j, k, l], [k, i, m]]]*len(lhs))
+
+        # self.__print_table(table) # Uncomment to print CYK table
+
+        # Generate a parse tree and return it if the parse exists or
+        # return None otherwise
+        if table[0][length]:
+            max_prob = table[0][length][0][1]
+            max_idx = 0
+
+            for i in range(1, len(table[0][length])):
+                prob = table[0][length][i][1]
+                if prob > max_prob:
+                    max_prob = prob
+                    max_idx = i
     
-    # Create the table; index j for rows, i for columns
-    length = len(sentence)
-    table = [None] * (length)
-    for j in range(length):
-	table[j] = [None] * (length+1)
-	for i in range(length+1):
-	    table[j][i] = []
+            return self.__to_tree(table, pointer, sentence, 0, length, max_idx)
 
-    # Create a pointer table
-    pointer = [None] * (length)
-    for j in range(length):
-        pointer[j] = [None] * (length+1)
-        for i in range(length+1):
-            pointer[j][i] = []
+        else:
+            return None
 
-    # Fill the diagonal of the table with the parts-of-speech of the words
-    for k in range(1,length+1):
-	table[k-1][k].extend(producers((sentence[k-1], 0)))
-        #print table[k-1][k]
-        #pointer[]
-        #print table[k-1][k]
+    def to_str(self, tree):
+        """Return the formatted string of a parse tree."""
 
-    # Fill CYK table
-    for i in range (1, length+1):
-        for j in range(i-2, -1, -1):
-            for k in range(j+1, i):
-                # Test all combinations of rhslist
-                for l in range(len(table[j][k])):
-                    for m in range(len(table[k][i])):
-                        rhslist = (table[j][k][l][0]+' '+table[k][i][m][0], table[j][k][l][1]+table[k][i][m][1])
-                        lhs = producers(rhslist)
-                        #print lhs
-                        if lhs:
-                            table[j][i].extend(lhs)
-                            pointer[j][i].extend([[[j, k, l], [k, i, m]]]*len(lhs))
-        #if not table[j][i]: print 'Cell', j, i, 'is empty'
-                            
+        # Stringify any lists inside tree
+        for i in range(len(tree)):
+            if isinstance(tree[i], list):
+                tree[i] = self.to_str(tree[i])
 
-    # Print the table
-    #printtable(table, sentence)
-    #printtable(pointer, sentence)
-
-    # Print tree
-    #print table[0][length]
-    if table[0][length]:
-        maxprob = table[0][length][0][1]
-        maxidx = 0
-
-        for i in range(1, len(table[0][length])):
-            prob = table[0][length][i][1]
-            if prob > maxprob:
-                maxprob = prob
-                maxidx = i
-    
-        return parsetree(table, pointer, sentence, 0, length, maxidx)
-    else: return None
-
-def printlanguage ():
-    file = open('languageoutput.txt', 'w')
-
-    "Randomly generate many sentences, saving and printing the unique ones"
-    language = {}
-    size = 0
-    for i in range(10000):
-	sentencestr = ' '.join(generate('S'))
-	language[sentencestr] = 1
-	if len(language) > size:
-	    size = len(language)
-	    #print '+',
-	else:
-	    #print '.',
-	    sys.stdout.flush()
-
-    for s in language.keys():
-	print s
-        file.write(s + '\n')
-    print size
-    file.write(str(size))
-    #print generate_tree('S')
-    #print generate('S')
-
-    file.close()
-
-def printsentence ():
-    print ' '.join(generate('S'))
-        
-def printtest():
-    sentences = open('data/tst.raw', 'r').readlines()
-    fout = open('data/tst.parse.my', 'w')
-    out = ''
-    count = 1
-    for sent in sentences:
-        tree = parse(sent.split())
-        if tree is not None:
-            treestr = str(tree).replace('\'','').replace(',', '')
-            treestr = treestr.replace('[', '(').replace(']', ')')
-            out += treestr + '\n'
-            print 'successfully parsed', count, 'out of 96 test sentences'
-            count += 1
-        else: print 'parsing unsuccessful'
-
-    fout.write(out)
-
-grammar = getgrammar('data/weighted.rule')
-printtest()
-
-#parse('Not much of a trip'.split())
-#parse('These people had flesh injuries'.split())
-#print producers(['Det', 'N'])
-#printsentence()
-#sent1 = parse('the man with the pickles hit the red ball'.split())
-#sent2 = parse('the dog with a party thinks that a ball sees the light'.split())
-#sent3 = parse('the school with the pickles hits the red ball'.split())
-#sent4 = parse('the ball that pickles the dogs liked skinny goggles with the red light'.split())
-#sent5 = parse('ball pickles the skinny ball'.split())
-#print str(sent1) + ' ' + str(sent2) + ' ' + str(sent3) + ' ' + str(sent4) + ' ' +str(sent5)
-#printlanguage()
+        # Turn the list of strings, tree, into a formatted string
+        return "({})".format(' '.join(tree))

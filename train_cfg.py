@@ -1,13 +1,14 @@
 #!/usr/bin/python
 # -------------------------------------------------------
 # author     : Jinho D. Choi
-# last update: 10/24/2012
+# modified by: Debora Sujono
+# last update: 5/9/2014
 # -------------------------------------------------------
 import sys
 import re
 import os
 import operator
-from treebank import *
+from lib.treebank import *
 from math import log
 
 # Reads a parse file, extract phrase structure rules, and prints the rules to an output file
@@ -40,18 +41,17 @@ def getRules(ruleFile):
         else:
             rules[lhs] = {rhs: 1}
 
-    #Create <UNK> to handle unseen terminals and unknown non-terminal rules
+    # Turns the count of words that occur only once into <UNK> count
+    # to handle unseen terminals and delete non-terminal rules that occur
+    # only once to improve rule accuracy
     for lhs in rules.keys():
         r = rules[lhs]
         for rhs in r.keys():
             if r[rhs] == 1:
                 del r[rhs]
                 if len(rhs.split()) == 1:
-                    if '<UNKT>' in r: r['<UNKT>'] += 1
-                    else: r['<UNKT>'] = 1
-                else:
-                    if '<UNKNT>' in r: r['<UNKNT>'] += 1
-                    else: r['<UNKNT>'] = 1
+                    if '<UNK>' in r: r['<UNK>'] += 1
+                    else: r['<UNK>'] = 1
     
     return rules
     
@@ -75,12 +75,15 @@ def printDict(rules, weightFile):
             print '%4s -> %16s %8.6f' % (lhs, rhs, r[rhs])
             fout.write(lhs + ' ' + rhs + ' ' + str(r[rhs]) + '\n')
 
-PARSE_FILE = 'trn.parse'
-RULE_FILE  = 'unweighted.rule'
-WEIGHT_FILE = 'weighted.rule'
+def main():
+    PARSE_FILE = 'data/trn.parse'
+    RULE_FILE  = 'data/unweighted.rule'
+    WEIGHT_FILE = 'data/weighted.rule'
 
-printRules(PARSE_FILE, RULE_FILE)
-rules = getRules(RULE_FILE)
-toProbabilities(rules)
-printDict(rules, WEIGHT_FILE)
+    printRules(PARSE_FILE, RULE_FILE)
+    rules = getRules(RULE_FILE)
+    toProbabilities(rules)
+    printDict(rules, WEIGHT_FILE)
 
+if __name__ == '__main__':
+    main()
