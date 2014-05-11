@@ -19,6 +19,7 @@ def printRules(parseFile, ruleFile):
 
     for tree in reader:
         for rule in tree.getPhraseRules():
+            print rule
             fout.write(' '.join(rule)+'\n')
 
 # Reads phrase structure rules from a rule file and returns a dictionary containing the rules
@@ -79,6 +80,9 @@ def main():
     PARSE_FILE = 'data/trn.parse'
     RULE_FILE  = 'data/unweighted.rule'
     WEIGHT_FILE = 'data/weighted.rule'
+
+    if len(sys.argv) == 2:
+        PARSE_FILE = sys.argv[1]
 
     printRules(PARSE_FILE, RULE_FILE)
     rules = getRules(RULE_FILE)

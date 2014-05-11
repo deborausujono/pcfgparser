@@ -1,10 +1,8 @@
 from random import choice
 
 class PCFGParser:
-    RULES = 'data/weighted.rule'
-
-    def __init__(self):
-        self.grammar = self.__read_grammar(self.RULES)
+    def __init__(self, rules='data/weighted.rule'):
+        self.grammar = self.__read_grammar(rules)
 
     def __read_grammar(self, f):
         """Given a file containing weighted rules, f, return a dictionary of
@@ -28,9 +26,16 @@ class PCFGParser:
 
         return grammar
 
-    def __mappend(self, fn, list):
-        """Append the results of calling fn on each element of list."""
-        return reduce(lambda x,y: x+y, map(fn, list))
+    def __generate_each(self, cat_pair, depth):
+        """Given a list of categories to combine (e.g. ['NP', 'VP']),
+        generate a sentence, phrase or word for each category and return a list
+        of tokens or None, if None is generated for any category."""
+        
+        (left, right) = [self.generate(cat, depth) for cat in cat_pair]
+        if all((left, right)):
+            return left+right
+        else:
+            return None
 
     def __producers(self, rhs, prob):
         """Given the rhs of a rule (e.g. "NP VP", "president"), rhs, and
@@ -87,16 +92,22 @@ class PCFGParser:
         for row in table:
             print row[1:]
 
-    def generate(self, cat):
-        """Given a syntactic category (e.g. S, VP, NN), cat, return a
-        randomly generated sentence, phrase or word of that category."""
+    def generate(self, cat, depth=0):
+        """Given a syntactic category (e.g. S, VP, NN), cat,
+        return a randomly generated sentence, phrase or word of that category.
+        The variable depth tracks the recrusion depth to avoid infinite
+        recursion due to randomly chosen production rules."""
 
-        if isinstance(cat, list): 
-            return self.__mappend(self.generate, cat)
-        elif cat in self.grammar:
-            return self.generate(choice(self.grammar[cat].keys()).split())
-        else:
-            return [cat]
+        if depth > 20:
+            return None
+        
+        # Randomly choose the rhs rule excluding <UNK>
+        rhs = choice([k for k in self.grammar[cat].keys() if k != '<UNK>']).split()
+
+        if len(rhs) == 1: # rhs is a terminal node
+            return rhs
+        else: # rhs is a list of two non-terminal nodes
+            return self.__generate_each(rhs, depth+1)
 
     def parse(self, sentence):
         """The CYK parser. Given a list of words, sentence, return its parse
