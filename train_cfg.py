@@ -77,12 +77,12 @@ def printDict(rules, weightFile):
             fout.write(lhs + ' ' + rhs + ' ' + str(r[rhs]) + '\n')
 
 def main():
-    PARSE_FILE = 'data/trn.parse'
     RULE_FILE  = 'data/unweighted.rule'
     WEIGHT_FILE = 'data/weighted.rule'
-
     if len(sys.argv) == 2:
         PARSE_FILE = sys.argv[1]
+    else:
+        PARSE_FILE = 'data/trn.parse'
 
     printRules(PARSE_FILE, RULE_FILE)
     rules = getRules(RULE_FILE)
